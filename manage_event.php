@@ -3,8 +3,8 @@
 include('config.php'); // Adjust path if necessary
 
 if (isset($_POST['add_event'])) {
-    $event_name = $_POST['event_name'];  
-    $team_id = $_POST['team_id'];    
+    $event_name = $_POST['event_name'];
+    $team_id = $_POST['team_id'];
     $date = $_POST['event_date'];
     $event_description = $_POST['event_description'];
     // Start a transaction
@@ -14,7 +14,7 @@ if (isset($_POST['add_event'])) {
         // Insert new event
         $sqlEvent = "INSERT INTO event (name, date, description) VALUES (?, ?,?)";
         if ($stmtEvent = $conn->prepare($sqlEvent)) {
-            $stmtEvent->bind_param("sss", $event_name, $date,$event_description);
+            $stmtEvent->bind_param("sss", $event_name, $date, $event_description);
             $stmtEvent->execute();
             $event_id = $conn->insert_id; // Get the last inserted event ID
             $stmtEvent->close();
@@ -62,14 +62,11 @@ if (isset($_POST['add_event'])) {
 
 // Handle Update
 if (isset($_POST['update_event'])) {
-    $event_id = $_POST['event_id']; 
+    $event_id = $_POST['event_id'];
     $team_id = $_POST['team_id'];
-    $event_name = $_POST['event_name']; 
+    $event_name = $_POST['event_name'];
     $date = $_POST['date'];
     $description = $_POST['description'];
-
-    // // Start a transaction to ensure atomic updates
-    // $conn->begin_transaction();
 
     try {
         // Update the event details
@@ -110,10 +107,28 @@ if (isset($_GET['delete_event'])) {
         $stmt->close();
     }
 }
+
+$query = "SELECT COUNT(e.idevent) AS total FROM event e INNER JOIN event_teams et ON e.idevent=et.idevent 
+        INNER JOIN team t  ON et.idteam=t.idteam";
+$result = $conn->query($query);
+if (!$result) {
+    die('Error: ' . $conn->error);
+}
+
+$row = $result->fetch_assoc();
+$total_teams = $row['total'];
+
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+$limit = 3;
+$total_pages = ceil($total_teams / $limit);
+if ($page < 1)
+    $page = 1;
+
+$start = ($page * $limit) - $limit;
 $sql = "SELECT e.idevent, e.name as event_name, t.name as team_name, e.date, e.description 
         FROM event e 
         INNER JOIN event_teams et ON e.idevent=et.idevent 
-        INNER JOIN team t  ON et.idteam=t.idteam";
+        INNER JOIN team t  ON et.idteam=t.idteam LIMIT $start, $limit";
 $events = $conn->query($sql);
 $teams = $conn->query("SELECT idteam, name FROM team");
 $conn->close();
@@ -121,6 +136,7 @@ $conn->close();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -130,42 +146,57 @@ $conn->close();
             font-family: Arial, sans-serif;
             margin: 20px;
         }
+
         .container {
             max-width: 800px;
             margin: auto;
         }
+
         h1 {
             text-align: center;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
         }
-        table, th, td {
+
+        table,
+        th,
+        td {
             border: 1px solid #ddd;
         }
-        th, td {
+
+        th,
+        td {
             padding: 8px;
             text-align: left;
         }
+
         th {
             background-color: #f2f2f2;
         }
+
         form {
             margin-top: 20px;
         }
+
         .form-group {
             margin-bottom: 15px;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 5px;
         }
-        .form-group input, .form-group select {
+
+        .form-group input,
+        .form-group select {
             width: 100%;
             padding: 8px;
             box-sizing: border-box;
         }
+
         .form-group button {
             padding: 10px 15px;
             background-color: #007bff;
@@ -173,11 +204,13 @@ $conn->close();
             border: none;
             border-radius: 5px;
         }
+
         .form-group button:hover {
             background-color: #0056b3;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Manage Events</h1>
@@ -198,8 +231,8 @@ $conn->close();
                         <option value="<?php echo $team['idteam']; ?>"><?php echo $team['name']; ?></option>
                     <?php endwhile; ?>
                 </select>
-                <label for="description">Description:</label>    
-            <input type="text" name="event_description">
+                <label for="description">Description:</label>
+                <input type="text" name="event_description">
             </div>
             <div class="form-group">
                 <button type="submit" name="add_event">Add Event</button>
@@ -220,15 +253,33 @@ $conn->close();
                     <td><?php echo $event['event_name']; ?></td>
                     <td><?php echo $event['date']; ?></td>
                     <td><?php echo $event['team_name']; ?></td>
-                    <td><?php echo $event['description'];?></td>
+                    <td><?php echo $event['description']; ?></td>
                     <td>
                         <a href="update_event.php?idevent=<?php echo $event['idevent']; ?>">Edit</a>
-                        <a href="manage_event.php?delete_event=<?php echo $event['idevent']; ?>" onclick="return confirm('Are you sure?');">Delete</a>
+                        <a href="manage_event.php?delete_event=<?php echo $event['idevent']; ?>"
+                            onclick="return confirm('Are you sure?');">Delete</a>
                     </td>
                 </tr>
             <?php endwhile; ?>
         </table>
+        <div>
+            <?php if ($page > 1): ?>
+                <a href="?page=<?php echo $page - 1; ?>">Previous</a>
+            <?php endif; ?>
+
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <a href="?page=<?php echo $i; ?>" <?php if ($page == $i)
+                       echo 'style="font-weight: bold;"'; ?>>
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+
+            <?php if ($page < $total_pages): ?>
+                <a href="?page=<?php echo $page + 1; ?>">Next</a>
+            <?php endif; ?>
+        </div>
         <button onclick="window.location.href='admin_dashboard.php';">Go Back</button>
     </div>
 </body>
+
 </html>

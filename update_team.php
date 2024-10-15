@@ -93,7 +93,6 @@
         <div class="form-group">
             <label for="game_id">Game:</label>
             <select id="game_id" name="game_id" required>
-               
                 <?php while ($teamRow = $resTeam->fetch_assoc()): ?>
                 <option value="<?php echo $teamRow['idgame']; ?>"
                     <?php if ($teamRow['idgame'] == $row['idgame']) echo 'selected'; ?>>

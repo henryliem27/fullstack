@@ -98,29 +98,22 @@
     //game data dropdown list
     $gameQuery = "SELECT * FROM game";
     $resTeam = $conn->query($gameQuery);
-
+    $teamRow = $resTeam->fetch_assoc(); 
     ?>
     <form action="manage_game.php" method="post">
         <h2>Update game</h2>
         <div class="form-group">
             <label for="game_id">Game Name:</label>
-            <select name="game_id" aria-readonly="true">
-                <?php while ($teamRow = $resTeam->fetch_assoc()): ?>
-                    <option value="<?php echo $teamRow['idgame']; ?>" <?php if ($teamRow['idgame'] == $row['idgame'])
-                           echo 'selected'; ?> aria-readonly="true">
-                        <?php echo $teamRow['name']; ?>
-                        <?php endwhile; ?>
-                    </option>
-               
-            </select>
+                <input type="text" name="game_name" value="<?php echo $row['name'] ?>">
+            </option>
         </div>
         <div class="form-group">
             <label for="game_description">Game Description:</label>
-            <input type="text" name="game_description" value="<?php echo $row['description']?>">
-            <input type="hidden" name="game_name" value="<?= $row['name'] ?>">
+            <input type="text" name="game_description" value="<?php echo $row['description'] ?>">
+            <input type="hidden" name="game_id" value="<?= $row['idgame'] ?>">
         </div>
         <div class="form-group">
-            <button type="submit" name="update_game">Update game</button>
+            <button type="submit" name="update_game">Update Game</button>
         </div>
     </form>
 </body>

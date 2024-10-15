@@ -80,7 +80,6 @@
     if (!file_exists('config.php')) {
         die('Restricted access');
     }
-
     require_once('config.php');
 
     if (isset($_GET['idevent'])) {

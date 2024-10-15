@@ -40,16 +40,27 @@ if (isset($_GET['delete_team'])) {
     }
 }
 
-// Fetch
-$sql = "SELECT t.idteam, t.name AS team_name, g.name AS game_name
-        FROM team t
-        JOIN game g ON t.idgame = g.idgame";
-$teams = $conn->query($sql);
-
+$limit = 3;
+$query1 = "SELECT COUNT(idteam) AS total FROM team";
+$result1 = $conn->query($query1);
+$row1 = $result1->fetch_assoc();
+$total_teams = $row1['total'];
 // Fetch games for dropdown
 $games = $conn->query("SELECT idgame, name FROM game");
 
+
+$total_pages = ceil($total_teams / $limit);
+
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+if ($page < 1)
+    $page = 1;
+$start = ($page - 1) * $limit;
+$sql = "SELECT t.idteam, t.name AS team_name, g.name AS game_name
+        FROM team t
+        JOIN game g ON t.idgame = g.idgame LIMIT $start, $limit";
+$teams = $conn->query($sql);
 $conn->close();
+
 ?>
 
 <!DOCTYPE html>
@@ -148,15 +159,11 @@ $conn->close();
                         </option>
                     <?php endwhile; ?>
                 </select>
-                <label for="description">Description:</label>
-                <input type="text" name="description" id="textareadesc">
             </div>
             <div class="form-group">
                 <button type="submit" name="add_team">Add Team</button>
             </div>
         </form>
-
-        <!-- Table Teams -->
         <h2>Existing Teams</h2>
         <table>
             <tr>
@@ -176,6 +183,22 @@ $conn->close();
                 </tr>
             <?php endwhile; ?>
         </table>
+        <div>
+            <?php if ($page > 1): ?>
+                <a href="?page=<?php echo $page - 1; ?>">Previous</a>
+            <?php endif; ?>
+
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <a href="?page=<?php echo $i; ?>" <?php if ($page == $i)
+                       echo 'style="font-weight: bold;"'; ?>>
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+
+            <?php if ($page < $total_pages): ?>
+                <a href="?page=<?php echo $page + 1; ?>">Next</a>
+            <?php endif; ?>
+        </div>
         <button onclick="window.location.href='admin_dashboard.php';">Go Back</button>
     </div>
 </body>

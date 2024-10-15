@@ -1,14 +1,31 @@
 <?php
 
 include('config.php');
+
+$query = "SELECT COUNT(a.idachievement) AS total FROM achievement a
+        INNER JOIN team t ON a.idteam = t.idteam";
+$result = $conn->query($query);
+if (!$result) {
+    die('Error: ' . $conn->error);
+}
+
+$row = $result->fetch_assoc();
+$total_teams = $row['total'];
+
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+$limit = 3;
+$total_pages = ceil($total_teams / $limit);
+if ($page < 1)
+    $page = 1;
+
+$start = ($page * $limit) - $limit;
 $sql = "SELECT a.idachievement, a.name AS achievement_name, t.name AS team_name , a.description
         FROM achievement a
-        JOIN team t ON a.idteam = t.idteam";
+        JOIN team t ON a.idteam = t.idteam LIMIT $start, $limit";
 $achievements = $conn->query($sql);
 $teams = $conn->query("SELECT idteam, name FROM team");
 $conn->close();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -114,6 +131,22 @@ $conn->close();
                 </tr>
             <?php endwhile; ?>
         </table>
+        <div>
+            <?php if ($page > 1): ?>
+                <a href="?page=<?php echo $page - 1; ?>">Previous</a>
+            <?php endif; ?>
+
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <a href="?page=<?php echo $i; ?>" <?php if ($page == $i)
+                       echo 'style="font-weight: bold;"'; ?>>
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+
+            <?php if ($page < $total_pages): ?>
+                <a href="?page=<?php echo $page + 1; ?>">Next</a>
+            <?php endif; ?>
+        </div>
         <button onclick="window.location.href='admin_dashboard.php';">Go Back</button>
     </div>
 </body>
