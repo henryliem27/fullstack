@@ -4,12 +4,12 @@ include('config.php'); // Adjust path if necessary
 
 if (isset($_POST['add_event'])) {
     $event_name = $_POST['event_name'];
-    $team_id = $_POST['team_id'];
+    $teams_id = $_POST['teams_id'];
     $date = $_POST['event_date'];
     $event_description = $_POST['event_description'];
+
     // Start a transaction
     $conn->begin_transaction();
-
     try {
         // Insert new event
         $sqlEvent = "INSERT INTO event (name, date, description) VALUES (?, ?,?)";
@@ -22,10 +22,10 @@ if (isset($_POST['add_event'])) {
             throw new Exception("Error preparing event insert: " . $conn->error);
         }
 
-        // Check if the provided team_id exists in the `team` table
+        // Check if the provided teams_id exists in the `team` table
         $sqlCheckTeam = "SELECT idteam FROM team WHERE idteam = ?";
         if ($stmtCheckTeam = $conn->prepare($sqlCheckTeam)) {
-            $stmtCheckTeam->bind_param("i", $team_id);  // Use `i` for integer type
+            $stmtCheckTeam->bind_param("i", $teams_id);  // Use `i` for integer type
             $stmtCheckTeam->execute();
             $stmtCheckTeam->store_result();
             if ($stmtCheckTeam->num_rows > 0) {
@@ -40,15 +40,16 @@ if (isset($_POST['add_event'])) {
         }
 
         // Insert the association into `event_teams` table
+        for ($i = 0; $i < count($teams_id); $i++) {
         $sqlEventTeam = "INSERT INTO event_teams (idevent, idteam) VALUES (?, ?)";
         if ($stmtEventTeam = $conn->prepare($sqlEventTeam)) {
-            $stmtEventTeam->bind_param("ii", $event_id, $team_id);
+            $stmtEventTeam->bind_param("ii", $event_id, $teams_id[$i]);
             $stmtEventTeam->execute();
             $stmtEventTeam->close();
         } else {
             throw new Exception("Error preparing event_teams insert: " . $conn->error);
         }
-
+    }
         // Commit the transaction
         $conn->commit();
         echo "Insert successful";
@@ -63,7 +64,7 @@ if (isset($_POST['add_event'])) {
 // Handle Update
 if (isset($_POST['update_event'])) {
     $event_id = $_POST['event_id'];
-    $team_id = $_POST['team_id'];
+    $teams_id = $_POST['teams_id'];
     $event_name = $_POST['event_name'];
     $date = $_POST['date'];
     $description = $_POST['description'];
@@ -79,18 +80,27 @@ if (isset($_POST['update_event'])) {
             throw new Exception("Error preparing event update statement: " . $conn->error);
         }
 
-        // Check if team needs to be updated
-        $sqlTeam = "UPDATE event_teams SET idteam= ? WHERE idevent = ?";
-        if ($stmtTeam = $conn->prepare($sqlTeam)) {
-            $stmtTeam->bind_param("si", $team_id, $event_id);
-            $stmtTeam->execute();
-            $stmtTeam->close();
+        // Clear existing team associations
+        $sqlDeleteTeams = "DELETE FROM event_teams WHERE idevent = ?";
+        if ($stmtDeleteTeams = $conn->prepare($sqlDeleteTeams)) {
+            $stmtDeleteTeams->bind_param("i", $event_id);
+            $stmtDeleteTeams->execute();
+            $stmtDeleteTeams->close();
         } else {
-            throw new Exception("Error preparing team update statement: " . $conn->error);
+            throw new Exception("Error preparing delete team statement: " . $conn->error);
         }
 
-        // // Commit the transaction
-        // $conn->commit();
+        // Insert updated team associations
+        $sqlInsertTeams = "INSERT INTO event_teams (idevent, idteam) VALUES (?, ?)";
+        if ($stmtInsertTeams = $conn->prepare($sqlInsertTeams)) {
+            foreach ($teams_id as $team_id) {
+                $stmtInsertTeams->bind_param("ii", $event_id, $team_id);
+                $stmtInsertTeams->execute();
+            }
+            $stmtInsertTeams->close();
+        } else {
+            throw new Exception("Error preparing insert team statement: " . $conn->error);
+        }
         echo "Update Successful";
 
     } catch (Exception $e) {
@@ -108,15 +118,21 @@ if (isset($_GET['delete_event'])) {
     }
 }
 
-$query = "SELECT COUNT(e.idevent) AS total FROM event e INNER JOIN event_teams et ON e.idevent=et.idevent 
-        INNER JOIN team t  ON et.idteam=t.idteam";
+$query = "SELECT COUNT(*) AS total_events
+FROM (
+    SELECT e.idevent
+    FROM event e 
+    INNER JOIN event_teams et ON e.idevent = et.idevent 
+    INNER JOIN team t ON et.idteam = t.idteam 
+    GROUP BY e.idevent
+) AS grouped_events;";
 $result = $conn->query($query);
 if (!$result) {
     die('Error: ' . $conn->error);
 }
 
 $row = $result->fetch_assoc();
-$total_teams = $row['total'];
+$total_teams = $row['total_events'];
 
 $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 $limit = 3;
@@ -125,10 +141,11 @@ if ($page < 1)
     $page = 1;
 
 $start = ($page * $limit) - $limit;
-$sql = "SELECT e.idevent, e.name as event_name, t.name as team_name, e.date, e.description 
+$sql = "SELECT e.idevent, e.name as event_name, GROUP_CONCAT(t.name SEPARATOR ', ') as team_names, e.date, e.description 
         FROM event e 
-        INNER JOIN event_teams et ON e.idevent=et.idevent 
-        INNER JOIN team t  ON et.idteam=t.idteam LIMIT $start, $limit";
+        INNER JOIN event_teams et ON e.idevent = et.idevent 
+        INNER JOIN team t ON et.idteam = t.idteam 
+        GROUP BY e.idevent LIMIT $start, $limit";
 $events = $conn->query($sql);
 $teams = $conn->query("SELECT idteam, name FROM team");
 $conn->close();
@@ -225,12 +242,11 @@ $conn->close();
                 <input type="date" name="event_date" required>
             </div>
             <div class="form-group">
-                <label for="team_id">Team:</label>
-                <select id="team_id" name="team_id" required>
-                    <?php while ($team = $teams->fetch_assoc()): ?>
-                        <option value="<?php echo $team['idteam']; ?>"><?php echo $team['name']; ?></option>
-                    <?php endwhile; ?>
-                </select>
+                <label for="teams_id">Team:</label>
+                <?php while ($team = $teams->fetch_assoc()): ?>
+                    <?php echo $team['name']; ?><input type="checkbox" name="teams_id[]"
+                        value="<?php echo $team['idteam']; ?>">
+                <?php endwhile; ?>
                 <label for="description">Description:</label>
                 <input type="text" name="event_description">
             </div>
@@ -252,7 +268,7 @@ $conn->close();
                 <tr>
                     <td><?php echo $event['event_name']; ?></td>
                     <td><?php echo $event['date']; ?></td>
-                    <td><?php echo $event['team_name']; ?></td>
+                    <td><?php echo $event['team_names']; ?></td>
                     <td><?php echo $event['description']; ?></td>
                     <td>
                         <a href="update_event.php?idevent=<?php echo $event['idevent']; ?>">Edit</a>

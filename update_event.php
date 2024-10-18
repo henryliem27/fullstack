@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Edit Event</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,22 +82,28 @@
     }
     require_once('config.php');
 
+    $idteams = [];
     if (isset($_GET['idevent'])) {
         $id = $_GET['idevent'];
-        $sql = "SELECT e.idevent, e.name as event_name, t.name as team_name, e.date, e.description 
-        FROM event e 
-        INNER JOIN event_teams et ON e.idevent=et.idevent 
-        INNER JOIN team t  ON et.idteam=t.idteam where e.idevent = ?";
+        $sql = "SELECT e.idevent, e.name as event_name, t.name as team_name, t.idteam as teams_id, e.date, e.description 
+                FROM event e 
+                INNER JOIN event_teams et ON e.idevent=et.idevent 
+                INNER JOIN team t ON et.idteam=t.idteam 
+                WHERE e.idevent = ?";
+        
         $stmt = $conn->prepare($sql);
         $stmt->bind_param('i', $id);
         $stmt->execute();
         $res = $stmt->get_result();
 
-        if (!$row = $res->fetch_assoc()) {
+        if (!$res->num_rows) {
             die("Invalid ID");
         }
+        while ($row = $res->fetch_assoc()) {
+            $idteams[] = $row;
+        }
     }
-    //game data dropdown list
+
     $teamQuery = "SELECT * FROM team";
     $resTeam = $conn->query($teamQuery);
     ?>
@@ -105,27 +111,28 @@
         <h2>Edit Event</h2>
         <div class="form-group">
             <label for="event_name">Event Name:</label>
-            <input type="text" name="event_name" value="<?php echo $row['event_name'] ?>">
+            <input type="text" name="event_name" value="<?php echo $idteams[0]['event_name']; ?>">
         </div>
         <div class="form-group">
             <label for="date">Event Date:</label>
-            <input type="date" name="date" value="<?php echo $row['date'] ?>" required>
+            <input type="date" name="date" value="<?php echo $idteams[0]['date']; ?>" required>
         </div>
         <div class="form-group">
             <label for="team_name">Team:</label>
-            <select name="team_id" required>
+            <?php if (!empty($idteams)): ?>
                 <?php while ($team = $resTeam->fetch_assoc()): ?>
-                    <option value="<?php echo $team['idteam']; ?>" <?php if ($team['name'] == $row['team_name'])
-                           echo 'selected'; ?>>
-                        <?php echo $team['name']; ?>
-                    </option>
+                    <input type="checkbox" name="teams_id[]" value="<?php echo $team['idteam']; ?>" 
+                        <?php echo in_array($team['idteam'], array_column($idteams, 'teams_id')) ? 'checked' : ''; ?>>
+                    <?php echo $team["name"]; ?><br>
                 <?php endwhile; ?>
-            </select>
+            <?php else: ?>
+                <p>No teams associated with this event.</p>
+            <?php endif; ?>
+            <br>
             <label for="description">Description:</label>
-            <input type="text" name="description" value="<?php echo $row['description']?>">
+            <input type="text" name="description" value="<?php echo htmlspecialchars($idteams[0]['description']); ?>">
         </div>
-        <input type="hidden" name="event_id" value="<?= $row['idevent'] ?>">
-        <input type="hidden" name="team_name" value="<?= $row['team_name'] ?>">
+        <input type="hidden" name="event_id" value="<?= htmlspecialchars($idteams[0]['idevent']); ?>">
         <div class="form-group">
             <button type="submit" name="update_event">Update Event</button>
         </div>
