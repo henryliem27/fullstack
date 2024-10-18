@@ -66,9 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['join_team'])) {
         echo "<script>alert('Failed to submit proposal: " . $conn->error . "');</script>";
     }
 }
-
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -211,9 +209,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['join_team'])) {
     <a href="logout.php" class="back">Logout</a>
 
 </body>
-
 </html>
-
 <?php
 $conn->close();
 ?>
